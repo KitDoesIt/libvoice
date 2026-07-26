@@ -63,8 +63,39 @@ typedef struct VoiceDecoder VoiceDecoder;
 /** Number of samples per frame (10 ms @ 48 kHz). */
 #define VOICE_CODEC_FRAME_SIZE   480
 
-/** Maximum size of an Opus-encoded frame (worst case). */
-#define VOICE_CODEC_MAX_PACKET   4000
+/** Maximum size of an Opus-encoded frame (worst case).
+ *  Includes 2-byte sequence number header. */
+#define VOICE_CODEC_MAX_PACKET   4002
+
+/* ------------------------------------------------------------------ */
+/*  Network report (decoder → encoder feedback)                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Network quality report produced by the decoder.
+ *
+ * Call voice_decoder_get_report() periodically and, if desired,
+ * relay the recommended settings back to the encoder via
+ * voice_encoder_set_packet_loss() / voice_encoder_set_fec() /
+ * voice_encoder_set_bitrate().
+ */
+typedef struct {
+    /** Smoothed packet loss percentage (0–100). */
+    int   loss_percent;
+    /** Recommended FEC setting (0, 1, or 2). */
+    int   fec_recommend;
+    /** Recommended bitrate, or -1 for no change. */
+    int   bitrate_recommend;
+    /** Consecutive packets lost in the most recent burst.
+     *  0 = no loss currently happening. */
+    int   consecutive_lost;
+    /** Count of out-of-order (late/duplicate) packets since last report. */
+    int   out_of_order_count;
+    /** Total packets received (wrapping). */
+    int   total_received;
+    /** Total packets lost (wrapping). */
+    int   total_lost;
+} VoiceNetReport;
 
 /* ------------------------------------------------------------------ */
 /*  Encoder API                                                       */
@@ -92,14 +123,17 @@ VOICE_CODEC_API void voice_encoder_destroy(VoiceEncoder *enc);
  *
  * The input is 480 float samples (mono, 48 kHz, range approx [-1, 1]).
  * If denoising is enabled, the input is first passed through RNNoise.
- * The result is an Opus packet written to @p data_out.
+ *
+ * The output is a 2-byte sequence number followed by the Opus packet.
+ * Total size = 2 + opus_bytes.  The sequence number increments by 1
+ * each frame (uint16, wraps at 65535).
  *
  * @param  enc               Encoder handle.
  * @param  pcm_in            Input PCM samples (480 floats).
- * @param  data_out          Output buffer for compressed packet.
- * @param  data_out_capacity Size of @p data_out in bytes (max bytes to write).
- *                           Recommend VOICE_CODEC_MAX_PACKET (4000).
- * @return Number of bytes written to @p data_out,
+ * @param  data_out          Output buffer.  Must hold at least
+ *                           VOICE_CODEC_MAX_PACKET (4002) bytes.
+ * @param  data_out_capacity Size of @p data_out in bytes.
+ * @return Total number of bytes written (2 + opus bytes),
  *         or a negative value on error.
  */
 VOICE_CODEC_API int voice_encode(
@@ -185,12 +219,21 @@ VOICE_CODEC_API void voice_decoder_destroy(VoiceDecoder *dec);
 /**
  * Decode one frame from a compressed packet.
  *
- * The output is 480 float samples (mono, 48 kHz).
+ * The input must include the 2-byte sequence number header prepended
+ * by voice_encode().  The decoder uses it to detect gaps and track
+ * network statistics.
+ *
+ * If the sequence number reveals a gap (lost packets), the decoder
+ * automatically performs packet loss concealment for the missing
+ * frames internally and returns the decoded audio for the current
+ * packet.  One call = one frame = 480 samples.
  *
  * @param  dec               Decoder handle.
- * @param  data_in           Compressed Opus packet bytes.
+ * @param  data_in           Compressed packet bytes (with 2-byte seq header).
  * @param  data_in_len       Number of bytes in @p data_in.
- *                           Pass 0 to request packet loss concealment (PLC).
+ *                           Pass 0 to request packet loss concealment (PLC)
+ *                           for the next expected frame.
+ *                           Pass -1 to discard (late/duplicate packet).
  * @param  pcm_out           Output PCM buffer (must hold at least 480 floats).
  * @return Number of samples decoded (typically 480),
  *         or a negative value on error.
@@ -200,6 +243,17 @@ VOICE_CODEC_API int voice_decode(
     const uint8_t      *data_in,
     int                 data_in_len,
     float              *pcm_out);
+
+/**
+ * Get current network quality report from the decoder.
+ *
+ * Call this periodically (e.g. every 500ms) and relay the
+ * recommendations back to the encoder if desired.
+ *
+ * @param  dec     Decoder handle.
+ * @param  report  Output structure filled with current metrics.
+ */
+VOICE_CODEC_API void voice_decoder_get_report(VoiceDecoder *dec, VoiceNetReport *report);
 
 /* ------------------------------------------------------------------ */
 /*  Utility / info                                                    */

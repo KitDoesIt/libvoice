@@ -97,10 +97,46 @@ int           voice_decode(VoiceDecoder *dec,
                            const uint8_t *data_in,
                            int data_in_len,
                            float *pcm_out);
+void          voice_decoder_get_report(VoiceDecoder *dec,
+                                        VoiceNetReport *report);
 ```
 
-- Pass `data_in_len = 0` for **packet loss concealment** (PLC).
+- `data_in_len = 0` → explicit packet loss concealment (PLC).
+- `data_in_len = -1` → discard late/duplicate packet, returns PLC.
+- `data_in_len >= 3` → normal decode (packet includes 2-byte seq header).
 - Returns the number of samples decoded (typically 480), or negative on error.
+- The decoder transparently handles gaps: if seq reveals missing packets, it auto-inserts PLC frames.
+
+### Network report / adaptation
+
+The decoder tracks loss rate (EWMA-smoothed), consecutive loss, and out-of-order count.
+Call `voice_decoder_get_report()` periodically and relay recommendations back to the encoder:
+
+```c
+typedef struct {
+    int loss_percent;        // 0–100, EWMA-smoothed
+    int fec_recommend;       // 0, 1, or 2
+    int bitrate_recommend;   // bps, or -1 for no change
+    int consecutive_lost;    // current burst length
+    int out_of_order_count;  // since last report
+    int total_received;
+    int total_lost;
+} VoiceNetReport;
+```
+
+Typical adaptation loop (C#):
+
+```csharp
+// Every 500ms, check decoder report and adjust encoder
+var report = new VoiceNetReport();
+voice_decoder_get_report(dec, ref report);
+if (report.loss_percent != currentLoss) {
+    voice_encoder_set_packet_loss(enc, report.loss_percent);
+    voice_encoder_set_fec(enc, report.fec_recommend);
+    if (report.bitrate_recommend > 0)
+        voice_encoder_set_bitrate(enc, report.bitrate_recommend);
+}
+```
 
 ### Utility
 
@@ -120,7 +156,19 @@ public static class VoiceCodec
 {
     public const int SampleRate  = 48000;
     public const int FrameSize   = 480;
-    public const int MaxPacket   = 4000;
+    public const int MaxPacket   = 4002;  // includes 2-byte seq header
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct VoiceNetReport
+    {
+        public int loss_percent;
+        public int fec_recommend;
+        public int bitrate_recommend;
+        public int consecutive_lost;
+        public int out_of_order_count;
+        public int total_received;
+        public int total_lost;
+    }
 
     [DllImport("voice_codec")] public static extern IntPtr voice_encoder_create(int bitrate, int denoiseEnabled);
     [DllImport("voice_codec")] public static extern void   voice_encoder_destroy(IntPtr enc);
@@ -133,6 +181,7 @@ public static class VoiceCodec
     [DllImport("voice_codec")] public static extern IntPtr voice_decoder_create(int denoiseEnabled);
     [DllImport("voice_codec")] public static extern void   voice_decoder_destroy(IntPtr dec);
     [DllImport("voice_codec")] public static extern int    voice_decode(IntPtr dec, byte[] dataIn, int len, float[] pcmOut);
+    [DllImport("voice_codec")] public static extern void   voice_decoder_get_report(IntPtr dec, ref VoiceNetReport report);
 }
 ```
 
