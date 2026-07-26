@@ -1,0 +1,6 @@
+[submodule "extern/opus"]
+	path = extern/opus
+	url = https://github.com/xiph/opus.git
+[submodule "extern/rnnoise"]
+	path = extern/rnnoise
+	url = https://github.com/xiph/rnnoise.git
