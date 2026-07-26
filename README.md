@@ -146,10 +146,4 @@ libvoice/
 
 ## License
 
-This wrapper is MIT. The linked libraries carry their own licenses:
-
-| Library | License |
-|---|---|
-| [Opus](https://github.com/xiph/opus) | 3-clause BSD |
-| [RNNoise](https://github.com/xiph/rnnoise) | 3-clause BSD |
-| `libvoice` (this repo) | MIT |
+All code in this repository is [3-clause BSD](LICENSE), matching [Opus](https://github.com/xiph/opus) and [RNNoise](https://github.com/xiph/rnnoise).
