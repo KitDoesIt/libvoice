@@ -10,6 +10,12 @@ SO_FLAGS := -shared -lm
 # Allow override
 PREFIX   ?= /usr/local
 
+# Windows cross-compile (set via `make windows`)
+#   sudo apt install gcc-mingw-w64-x86-64
+WIN_CC    := x86_64-w64-mingw32-gcc
+WIN_AR    := x86_64-w64-mingw32-ar
+WIN_CFLAGS:= -O2 -Wall
+
 # ---------------------------------------------------------------------------
 # Source file lists
 # ---------------------------------------------------------------------------
@@ -266,6 +272,21 @@ $(BUILD_DIR)/rnnoise/%.o: $(RNNOISE_DIR)/%.c
 $(BUILD_DIR)/voice/%.o: src/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) $(VOICE_INC) $(OPUS_INC) $(RNNOISE_INC) $(VOICE_DEFS) -c $< -o $@
+
+# --- Windows cross-compile ---
+.PHONY: windows
+windows:
+	$(MAKE) clean
+	$(MAKE) CC=$(WIN_CC) AR=$(WIN_AR) CFLAGS="$(WIN_CFLAGS)" SO_FLAGS="-shared -static-libgcc -lm" all-win
+
+.PHONY: all-win
+all-win: build/libvoice_codec.dll
+
+build/libvoice_codec.dll: $(VOICE_OBJS) build/libopus.a build/librnnoise.a
+	@mkdir -p $(dir $@)
+	$(CC) -shared -static-libgcc -o $@ $(VOICE_OBJS) \
+		-Wl,--whole-archive build/libopus.a build/librnnoise.a \
+		-Wl,--no-whole-archive -lm
 
 # --- Install ---
 install: build/libvoice_codec.so

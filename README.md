@@ -17,20 +17,24 @@
 
 ## Building
 
+Prebuilt binaries are attached to [GitHub Releases](https://github.com/KitDoesIt/libvoice/releases).
+
+### Linux
 ```bash
-# Clone with submodules
 git clone --recurse-submodules https://github.com/KitDoesIt/libvoice.git
 cd libvoice
-
-# Download RNNoise model weights
 cd extern/rnnoise && bash download_model.sh && cd ../..
-
-# Build
 make
 # → build/libvoice_codec.so
 ```
-
 Requires: `gcc`, `make`, `ar`, `wget`.
+
+### Windows (cross-compile from Linux)
+```bash
+sudo apt install gcc-mingw-w64-x86-64
+make windows
+# → build/libvoice_codec.dll
+```
 
 ## API
 

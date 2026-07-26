@@ -1,0 +1,92 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  # ------------------------------------------------------------------
+  # Linux amd64 shared library
+  # ------------------------------------------------------------------
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Download RNNoise model
+        run: |
+          cd extern/rnnoise
+          bash download_model.sh
+
+      - name: Build Linux .so
+        run: make
+
+      - name: Strip
+        run: strip build/libvoice_codec.so
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libvoice-linux-amd64
+          path: build/libvoice_codec.so
+
+  # ------------------------------------------------------------------
+  # Windows x64 DLL (cross-compiled from Linux)
+  # ------------------------------------------------------------------
+  windows:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install mingw-w64
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc-mingw-w64-x86-64
+
+      - name: Download RNNoise model
+        run: |
+          cd extern/rnnoise
+          bash download_model.sh
+
+      - name: Build Windows .dll
+        run: make windows
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libvoice-windows-amd64
+          path: build/libvoice_codec.dll
+
+  # ------------------------------------------------------------------
+  # Create GitHub Release
+  # ------------------------------------------------------------------
+  release:
+    needs: [linux, windows]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: libvoice-linux-amd64
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: libvoice-windows-amd64
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            libvoice_codec.so
+            libvoice_codec.dll
+          generate_release_notes: true
