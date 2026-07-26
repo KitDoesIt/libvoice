@@ -35,12 +35,18 @@ VoiceEncoder *voice_encoder_create(int bitrate, int denoise_enabled)
         return NULL;
     }
 
-    /* Configure Opus bitrate */
+    /* Configure Opus for voice */
     if (bitrate > 0) {
         opus_encoder_ctl(enc->opus_enc, OPUS_SET_BITRATE(bitrate));
     }
     /* 10 ms frame size is the default; enforce it explicitly */
     opus_encoder_ctl(enc->opus_enc, OPUS_SET_EXPERT_FRAME_DURATION(OPUS_FRAMESIZE_10_MS));
+    /* Voice-optimised defaults */
+    opus_encoder_ctl(enc->opus_enc, OPUS_SET_SIGNAL(OPUS_SIGNAL_VOICE));
+    opus_encoder_ctl(enc->opus_enc, OPUS_SET_INBAND_FEC(1));
+    opus_encoder_ctl(enc->opus_enc, OPUS_SET_PACKET_LOSS_PERC(10));
+    opus_encoder_ctl(enc->opus_enc, OPUS_SET_DTX(1));
+    opus_encoder_ctl(enc->opus_enc, OPUS_SET_COMPLEXITY(5));
 
     /* Create RNNoise denoiser if enabled */
     if (denoise_enabled) {
@@ -98,4 +104,36 @@ int voice_encode_flush(VoiceEncoder *enc, uint8_t *data_out, int data_out_capaci
      * (DTX frames are emitted inline in opus_encode_float.)
      * So there is nothing extra to flush — return 0. */
     return 0;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Runtime configuration                                             */
+/* ------------------------------------------------------------------ */
+
+void voice_encoder_set_bitrate(VoiceEncoder *enc, int bitrate)
+{
+    if (!enc || !enc->opus_enc) return;
+    opus_encoder_ctl(enc->opus_enc, OPUS_SET_BITRATE(bitrate));
+}
+
+void voice_encoder_set_packet_loss(VoiceEncoder *enc, int loss_pct)
+{
+    if (!enc || !enc->opus_enc) return;
+    if (loss_pct < 0)  loss_pct = 0;
+    if (loss_pct > 100) loss_pct = 100;
+    opus_encoder_ctl(enc->opus_enc, OPUS_SET_PACKET_LOSS_PERC(loss_pct));
+}
+
+void voice_encoder_set_fec(VoiceEncoder *enc, int enable)
+{
+    if (!enc || !enc->opus_enc) return;
+    if (enable < 0) enable = 0;
+    if (enable > 2) enable = 2;
+    opus_encoder_ctl(enc->opus_enc, OPUS_SET_INBAND_FEC(enable));
+}
+
+void voice_encoder_set_dtx(VoiceEncoder *enc, int enable)
+{
+    if (!enc || !enc->opus_enc) return;
+    opus_encoder_ctl(enc->opus_enc, OPUS_SET_DTX(enable ? 1 : 0));
 }

@@ -120,6 +120,50 @@ VOICE_CODEC_API int voice_encode(
  */
 VOICE_CODEC_API int voice_encode_flush(VoiceEncoder *enc, uint8_t *data_out, int data_out_capacity);
 
+/**
+ * Set the target bitrate at runtime (bits per second).
+ *
+ * Can be called between encode calls to adapt to network conditions.
+ *
+ * @param enc     Encoder handle.
+ * @param bitrate Bitrate in bps (500–512000), or 0 for Opus default.
+ */
+VOICE_CODEC_API void voice_encoder_set_bitrate(VoiceEncoder *enc, int bitrate);
+
+/**
+ * Set the expected packet loss percentage.
+ *
+ * Higher values make the encoder more resilient to loss at the cost
+ * of slightly reduced quality when no loss occurs.
+ *
+ * @param enc        Encoder handle.
+ * @param loss_pct   0–100 (default 0).
+ */
+VOICE_CODEC_API void voice_encoder_set_packet_loss(VoiceEncoder *enc, int loss_pct);
+
+/**
+ * Enable or disable in-band forward error correction (FEC).
+ *
+ * When enabled, each packet contains a low-bitrate copy of the
+ * previous frame. At 1=FEC enabled, at 2=FEC enabled with auto
+ * switch to SILK even for music.
+ *
+ * @param enc      Encoder handle.
+ * @param enable   0=off, 1=on (SILK auto), 2=on (SILK for music too).
+ */
+VOICE_CODEC_API void voice_encoder_set_fec(VoiceEncoder *enc, int enable);
+
+/**
+ * Enable or disable discontinuous transmission (DTX).
+ *
+ * When DTX is on, the encoder emits tiny comfort-noise packets
+ * during silence instead of encoding background noise at full bitrate.
+ *
+ * @param enc      Encoder handle.
+ * @param enable   0=off, 1=on.
+ */
+VOICE_CODEC_API void voice_encoder_set_dtx(VoiceEncoder *enc, int enable);
+
 /* ------------------------------------------------------------------ */
 /*  Decoder API                                                       */
 /* ------------------------------------------------------------------ */

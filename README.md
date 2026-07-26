@@ -67,6 +67,27 @@ int           voice_encode_flush(VoiceEncoder *enc,
 - `voice_encode` returns the number of bytes written, or negative on error.
 - `voice_encode_flush` emits any DTX tail frames; returns 0 if nothing to flush.
 
+**Voice-optimized defaults** (applied at creation):
+
+| Setting | Default | Meaning |
+|---|---|---|
+| Signal type | `OPUS_SIGNAL_VOICE` | Biases encoder toward SILK speech mode |
+| FEC | enabled (1) | Each packet carries low-bitrate copy of previous frame |
+| Packet loss | 10% | Optimizes for typical network conditions |
+| DTX | enabled | Emits tiny comfort-noise packets during silence |
+| Complexity | 5 | Good quality/CPU balance for real-time |
+
+**Runtime configuration** (callable between `voice_encode`):
+
+```c
+void voice_encoder_set_bitrate    (VoiceEncoder *enc, int bitrate);
+void voice_encoder_set_packet_loss(VoiceEncoder *enc, int loss_pct);   // 0–100
+void voice_encoder_set_fec        (VoiceEncoder *enc, int enable);     // 0, 1, or 2
+void voice_encoder_set_dtx        (VoiceEncoder *enc, int enable);     // 0 or 1
+```
+
+These let you adapt to changing network conditions without recreating the encoder — e.g. crank up FEC and loss percentage when the connection degrades.
+
 ### Decoder
 
 ```c
@@ -104,6 +125,10 @@ public static class VoiceCodec
     [DllImport("voice_codec")] public static extern IntPtr voice_encoder_create(int bitrate, int denoiseEnabled);
     [DllImport("voice_codec")] public static extern void   voice_encoder_destroy(IntPtr enc);
     [DllImport("voice_codec")] public static extern int    voice_encode(IntPtr enc, float[] pcmIn, byte[] dataOut, int capacity);
+    [DllImport("voice_codec")] public static extern void   voice_encoder_set_bitrate(IntPtr enc, int bitrate);
+    [DllImport("voice_codec")] public static extern void   voice_encoder_set_packet_loss(IntPtr enc, int lossPct);
+    [DllImport("voice_codec")] public static extern void   voice_encoder_set_fec(IntPtr enc, int enable);
+    [DllImport("voice_codec")] public static extern void   voice_encoder_set_dtx(IntPtr enc, int enable);
 
     [DllImport("voice_codec")] public static extern IntPtr voice_decoder_create(int denoiseEnabled);
     [DllImport("voice_codec")] public static extern void   voice_decoder_destroy(IntPtr dec);
