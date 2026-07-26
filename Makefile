@@ -232,10 +232,7 @@ VOICE_INC   := -Iinclude
 # ---------------------------------------------------------------------------
 # Defines
 # ---------------------------------------------------------------------------
-OPUS_DEFS   := -DOPUS_BUILD -DFLOATING_POINT -DVAR_ARRAYS \
-               -DOPUS_X86_MAY_HAVE_SSE -DOPUS_X86_PRESUME_SSE \
-               -DOPUS_X86_MAY_HAVE_SSE2 -DOPUS_X86_PRESUME_SSE2 \
-               -DOPUS_X86_MAY_HAVE_SSE4_1 -DOPUS_X86_PRESUME_SSE4_1
+OPUS_DEFS   := -DOPUS_BUILD -DFLOATING_POINT -DVAR_ARRAYS
 
 RNNOISE_DEFS:= -DRNNOISE_BUILD
 
