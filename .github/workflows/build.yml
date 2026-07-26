@@ -58,6 +58,22 @@ jobs:
       - name: Build Windows .dll
         run: make windows
 
+      - name: Verify DLL has no non-system dependencies
+        run: |
+          echo "=== DLL imports ==="
+          x86_64-w64-mingw32-objdump -p build/libvoice_codec.dll | grep 'DLL Name:'
+          echo ""
+          echo "Only kernel32.dll and msvcrt.dll should appear above."
+          # Fail if any unexpected DLL is found
+          DEPS=$(x86_64-w64-mingw32-objdump -p build/libvoice_codec.dll | grep 'DLL Name:' | awk '{print $3}')
+          for dll in $DEPS; do
+            case "$dll" in
+              KERNEL32.dll|msvcrt.dll) ;;
+              *) echo "UNEXPECTED dependency: $dll" ; exit 1 ;;
+            esac
+          done
+          echo "OK — no third-party runtime dependencies."
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:

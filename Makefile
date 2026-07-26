@@ -15,6 +15,9 @@ PREFIX   ?= /usr/local
 WIN_CC    := x86_64-w64-mingw32-gcc
 WIN_AR    := x86_64-w64-mingw32-ar
 WIN_CFLAGS:= -O2 -Wall
+# -static-libgcc  embeds libgcc, avoid libgcc_s_seh-1.dll dep
+# -Wl,-Bstatic -lpthread -Wl,-Bdynamic  forces static libwinpthread (no DLL dep)
+WIN_LDFLAGS := -shared -static-libgcc -Wl,-Bstatic -lpthread -Wl,-Bdynamic -lm
 
 # ---------------------------------------------------------------------------
 # Source file lists
@@ -277,16 +280,16 @@ $(BUILD_DIR)/voice/%.o: src/%.c
 .PHONY: windows
 windows:
 	$(MAKE) clean
-	$(MAKE) CC=$(WIN_CC) AR=$(WIN_AR) CFLAGS="$(WIN_CFLAGS)" SO_FLAGS="-shared -static-libgcc -lm" all-win
+	$(MAKE) CC=$(WIN_CC) AR=$(WIN_AR) CFLAGS="$(WIN_CFLAGS)" SO_FLAGS="$(WIN_LDFLAGS)" all-win
 
 .PHONY: all-win
 all-win: build/libvoice_codec.dll
 
 build/libvoice_codec.dll: $(VOICE_OBJS) build/libopus.a build/librnnoise.a
 	@mkdir -p $(dir $@)
-	$(CC) -shared -static-libgcc -o $@ $(VOICE_OBJS) \
+	$(CC) $(SO_FLAGS) -o $@ $(VOICE_OBJS) \
 		-Wl,--whole-archive build/libopus.a build/librnnoise.a \
-		-Wl,--no-whole-archive -lm
+		-Wl,--no-whole-archive
 
 # --- Install ---
 install: build/libvoice_codec.so
